@@ -28,7 +28,7 @@ const NB: usize = 4;
 #[repr(align(16))]
 #[derive(Clone, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct ExpandedKey {
-    pub words: [u32; EXPANDED_KEY_SIZE],
+    words: [u32; EXPANDED_KEY_SIZE],
     round_key_bytes: [u8; (NR + 1) * 16],
 }
 
