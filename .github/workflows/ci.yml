@@ -72,8 +72,11 @@ jobs:
       - name: Restore Cargo Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Run Rust Tests
+      - name: Run Rust Tests (AES-NI dispatch path)
         run: cargo test -p tgcryptors-core --release
+
+      - name: Run Rust Tests (software fallback, no AES-NI)
+        run: cargo test -p tgcryptors-core --release --no-default-features
 
   python:
     name: Python ${{ matrix.python }} (${{ matrix.os }})
