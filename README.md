@@ -262,6 +262,20 @@ uv build --wheel
 
 ## Changelog
 
+### 1.3.2
+
+- `runtime_info()` now reports the runtime AES-NI probe in `aesni` (previously
+  the compile-time flag) and the flag itself in `aesni_compiled`.
+- Added NIST SP 800-38A CTR/CBC and AES-256-IGE known-answer tests (Rust and
+  Python).
+- CI now also runs the test suite with `--no-default-features`, covering the
+  software AES fallback.
+- `ctr256_encrypt`/`ctr256_decrypt` raise `ValueError` instead of panicking if
+  an `iv`/`state` `bytearray` is resized by another thread during the call.
+- `ExpandedKey` key-schedule fields are no longer publicly readable; internal
+  key/IV copies are zeroized on drop.
+- Removed the no-op `neon` feature flag.
+
 ### 1.3.1
 
 - `ctr256_encrypt`/`ctr256_decrypt` now accept `bytearray` (and `bytes`) for
