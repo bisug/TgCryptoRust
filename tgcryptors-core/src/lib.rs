@@ -26,6 +26,16 @@ pub const AESNI_FEATURE_ENABLED: bool = cfg!(feature = "aesni");
 /// AES block size in bytes (16).
 pub const AES_BLOCK_SIZE: usize = aes256::AES_BLOCK_SIZE;
 
+/// Decode a hex string (test helper for known-answer vectors).
+#[cfg(test)]
+pub(crate) fn unhex(s: &str) -> Vec<u8> {
+    assert!(s.len() % 2 == 0, "hex string must have even length");
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("valid hex"))
+        .collect()
+}
+
 /// Re-export the main APIs for convenience.
 pub use aes256::ExpandedKey;
 pub use cbc256::{cbc256_decrypt, cbc256_decrypt_into, cbc256_encrypt, cbc256_encrypt_into};

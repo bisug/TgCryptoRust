@@ -201,6 +201,66 @@ class TgCryptoApiTests(unittest.TestCase):
         self.assertEqual(info["implementation"], "rust")
         self.assertIsInstance(info["aesni"], bool)
 
+    def test_nist_sp800_38a_ctr_cbc_known_answers(self) -> None:
+        key = bytes.fromhex(
+            "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a20914dff4"
+        )
+        plaintext = bytes.fromhex(
+            "6bc1bee22e409f96e93d7e117393172a"
+            "ae2d8a571e03ac9c9eb76fac45f11162"
+            "30c81c46a35ce411e5fbc1191a0a52ef"
+            "f69f2445df4f9b17ad2b417be66c3710"
+        )
+
+        # NIST SP 800-38A F.5.5 CTR-AES256.Encrypt
+        ctr_iv = bytes.fromhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
+        ctr_expected = bytes.fromhex(
+            "2e6274c24ed1e2f3206fcf48162d2042"
+            "c8f450e4c9229675fb2f162f036432d0"
+            "9abf7567a68b9a223295eea7b60b5314"
+            "c7ad58ae08f2ba14743d1d136e47a0e9"
+        )
+        self.assertEqual(
+            tgcrypto.ctr256_encrypt(plaintext, key, ctr_iv, b"\x00"),
+            ctr_expected,
+        )
+        self.assertEqual(
+            tgcrypto.ctr256_decrypt(ctr_expected, key, ctr_iv, b"\x00"),
+            plaintext,
+        )
+
+        # NIST SP 800-38A F.5.3 CBC-AES256.Encrypt
+        cbc_iv = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
+        cbc_expected = bytes.fromhex(
+            "a58c38079fab0b976fd94e6ff61fc943"
+            "d46513dda7b29de14bd3b878a77240a4"
+            "d4994bb56bf379d9f74a36a8210f3ba1"
+            "dcd6ae01dd1949e7a02bd1010a8081b9"
+        )
+        self.assertEqual(
+            tgcrypto.cbc256_encrypt(plaintext, key, cbc_iv),
+            cbc_expected,
+        )
+        self.assertEqual(
+            tgcrypto.cbc256_decrypt(cbc_expected, key, cbc_iv),
+            plaintext,
+        )
+
+    def test_ige256_known_answer(self) -> None:
+        # Vector generated independently from the spec (ECB primitive via the
+        # `cryptography` library + IGE chaining equations).
+        key = bytes(range(32))
+        iv = bytes(range(32))
+        plaintext = bytes(range(64))
+        expected = bytes.fromhex(
+            "e28112a53e5c89c7b1ea8071c133699f"
+            "d4e86b26c4bac9fc5af1ab8ce27a44a4"
+            "a9b2dabae5a422acbb4422404b5950cc"
+            "e880d70cef7a432da00b3a5fc79a7b35"
+        )
+        self.assertEqual(tgcrypto.ige256_encrypt(plaintext, key, iv), expected)
+        self.assertEqual(tgcrypto.ige256_decrypt(expected, key, iv), plaintext)
+
     def test_tgcrypto_and_tgcryptors_imports_match(self) -> None:
         self.assertEqual(tgcrypto.__version__, tgcryptors.__version__)
         self.assertIs(tgcrypto.Ctr256, tgcryptors.Ctr256)

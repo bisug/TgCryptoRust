@@ -145,6 +145,7 @@ pub fn ige256_decrypt(data: &[u8], key: &[u8; 32], iv: &[u8; 32]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::unhex;
 
     fn test_key() -> [u8; 32] {
         core::array::from_fn(|i| (i as u8).wrapping_mul(7).wrapping_add(0x42))
@@ -221,5 +222,30 @@ mod tests {
         let iv = test_iv();
         let result = ige256_encrypt(b"", &key, &iv);
         assert_eq!(result, b"");
+    }
+
+    /// Known-answer test: AES-256-IGE vector generated independently from the
+    /// spec (ECB primitive via the `cryptography` library + IGE chaining
+    /// equations), not from this implementation.
+    #[test]
+    fn test_ige256_known_answer() {
+        let key: [u8; 32] =
+            unhex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+                .try_into()
+                .unwrap();
+        let iv: [u8; 32] =
+            unhex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+                .try_into()
+                .unwrap();
+        let plaintext: Vec<u8> = (0..64u8).collect();
+        let expected = unhex(
+            "e28112a53e5c89c7b1ea8071c133699fd4e86b26c4bac9fc5af1ab8ce27a44a4a9b2dabae5a422acbb4422404b5950cce880d70cef7a432da00b3a5fc79a7b35",
+        );
+
+        let ciphertext = ige256_encrypt(&plaintext, &key, &iv);
+        assert_eq!(ciphertext, expected);
+
+        let recovered = ige256_decrypt(&expected, &key, &iv);
+        assert_eq!(recovered, plaintext);
     }
 }

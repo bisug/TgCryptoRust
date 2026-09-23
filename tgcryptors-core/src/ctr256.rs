@@ -241,6 +241,7 @@ pub fn ctr256_decrypt(data: &[u8], key: &[u8; 32], iv: &mut [u8; 16], state: &mu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::unhex;
 
     fn test_key() -> [u8; 32] {
         core::array::from_fn(|i| (i as u8).wrapping_mul(7).wrapping_add(0x42))
@@ -385,5 +386,54 @@ mod tests {
         let mut out = [0u8; 1];
 
         ctr256_encrypt_into(&data, &key, &mut iv, &mut state, &mut out);
+    }
+
+    /// NIST SP 800-38A F.5.5 CTR-AES256 known-answer test.
+    #[test]
+    fn test_ctr256_nist_sp800_38a_f55() {
+        let key: [u8; 32] =
+            unhex("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a20914dff4")
+                .try_into()
+                .unwrap();
+        let mut iv: [u8; 16] = unhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
+            .try_into()
+            .unwrap();
+        let plaintext = unhex(
+            "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45f1116230c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+        );
+        let expected = unhex(
+            "2e6274c24ed1e2f3206fcf48162d2042c8f450e4c9229675fb2f162f036432d09abf7567a68b9a223295eea7b60b5314c7ad58ae08f2ba14743d1d136e47a0e9",
+        );
+
+        let mut state = 0u8;
+        let mut out = vec![0u8; plaintext.len()];
+        ctr256_encrypt_into(&plaintext, &key, &mut iv, &mut state, &mut out);
+
+        assert_eq!(out, expected);
+        assert_eq!(state, 0, "64 bytes consume whole keystream blocks");
+
+        // Counter must advance by plaintext_blocks (4) from the initial IV.
+        let mut expected_iv: [u8; 16] = unhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
+            .try_into()
+            .unwrap();
+        for _ in 0..4 {
+            let mut k = 16;
+            while k > 0 {
+                k -= 1;
+                expected_iv[k] = expected_iv[k].wrapping_add(1);
+                if expected_iv[k] != 0 {
+                    break;
+                }
+            }
+        }
+        assert_eq!(iv, expected_iv);
+
+        // Decrypting the KAT ciphertext must recover the plaintext.
+        let mut dec_iv: [u8; 16] = unhex("f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")
+            .try_into()
+            .unwrap();
+        let mut dec_state = 0u8;
+        let recovered = ctr256_decrypt(&expected, &key, &mut dec_iv, &mut dec_state);
+        assert_eq!(recovered, plaintext);
     }
 }
