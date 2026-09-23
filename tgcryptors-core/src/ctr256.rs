@@ -47,6 +47,10 @@ fn add_counter(iv: &[u8; 16], offset: u64) -> [u8; 16] {
 ///
 /// `state` is the next byte offset inside the current keystream block and must
 /// be preserved between chunked calls.
+///
+/// # Panics
+///
+/// Panics if the buffers differ in length or if `state` is not in `0..16`.
 pub fn ctr256_encrypt_into(
     data: &[u8],
     key: &[u8; 32],
