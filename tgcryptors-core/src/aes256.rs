@@ -28,7 +28,7 @@ const NB: usize = 4;
 #[repr(align(16))]
 #[derive(Clone, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct ExpandedKey {
-    pub words: [u32; EXPANDED_KEY_SIZE],
+    words: [u32; EXPANDED_KEY_SIZE],
     round_key_bytes: [u8; (NR + 1) * 16],
 }
 
@@ -82,6 +82,23 @@ fn use_aesni() -> bool {
             CACHED.store(if avail { 2 } else { 1 }, Ordering::Relaxed);
             avail
         }
+    }
+}
+
+/// Whether AES-NI is actually usable on this CPU right now.
+///
+/// Unlike [`crate::AESNI_FEATURE_ENABLED`] (compile-time flag), this performs
+/// the runtime CPUID probe, so it returns `false` on x86 CPUs without AES-NI
+/// and on builds without the `aesni` feature.
+#[inline]
+pub fn aesni_active() -> bool {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        use_aesni()
+    }
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    {
+        false
     }
 }
 

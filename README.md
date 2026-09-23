@@ -213,10 +213,14 @@ return types, and validation behavior match the original TgCrypto:
 
 On x86 and x86_64, AES-NI is detected at runtime when the crate is built with
 the default `aesni` feature. Other targets use a software fallback (T-table based,
-not guaranteed constant-time on every CPU).
+not guaranteed constant-time on every CPU). `runtime_info()` reports both the
+compile-time flag (`aesni_compiled`) and the runtime probe (`aesni`).
 
-Expanded key material is zeroized on drop using the [`zeroize`](https://crates.io/crates/zeroize)
-crate, which guarantees the compiler will not optimize away the clearing.
+Expanded key material, key/IV copies made internally, and `bytearray` snapshots
+taken for the duration of a call are zeroized on drop using the
+[`zeroize`](https://crates.io/crates/zeroize) crate, which guarantees the
+compiler will not optimize away the clearing. Returned `bytes` objects live in
+Python's allocator and are not zeroized.
 
 ## Migrating From TgrCrypto
 
@@ -257,6 +261,20 @@ uv build --wheel
 ```
 
 ## Changelog
+
+### 1.3.2
+
+- `runtime_info()` now reports the runtime AES-NI probe in `aesni` (previously
+  the compile-time flag) and the flag itself in `aesni_compiled`.
+- Added NIST SP 800-38A CTR/CBC and AES-256-IGE known-answer tests (Rust and
+  Python).
+- CI now also runs the test suite with `--no-default-features`, covering the
+  software AES fallback.
+- `ctr256_encrypt`/`ctr256_decrypt` raise `ValueError` instead of panicking if
+  an `iv`/`state` `bytearray` is resized by another thread during the call.
+- `ExpandedKey` key-schedule fields are no longer publicly readable; internal
+  key/IV copies are zeroized on drop.
+- Removed the no-op `neon` feature flag.
 
 ### 1.3.1
 

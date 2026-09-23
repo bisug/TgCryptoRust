@@ -164,6 +164,7 @@ pub fn cbc256_decrypt(data: &[u8], key: &[u8; 32], iv: &mut [u8; 16]) -> Vec<u8>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::unhex;
 
     fn test_key() -> [u8; 32] {
         core::array::from_fn(|i| (i as u8).wrapping_mul(7).wrapping_add(0x42))
@@ -215,5 +216,35 @@ mod tests {
         let mut out = vec![0u8; data.len()];
 
         cbc256_encrypt_into(&data, &key, &mut iv, &mut out);
+    }
+
+    /// NIST SP 800-38A F.5.3 CBC-AES256 known-answer test.
+    #[test]
+    fn test_cbc256_nist_sp800_38a_f53() {
+        let key: [u8; 32] =
+            unhex("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a20914dff4")
+                .try_into()
+                .unwrap();
+        let mut iv: [u8; 16] = unhex("000102030405060708090a0b0c0d0e0f")
+            .try_into()
+            .unwrap();
+        let plaintext = unhex(
+            "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45f1116230c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+        );
+        let expected = unhex(
+            "a58c38079fab0b976fd94e6ff61fc943d46513dda7b29de14bd3b878a77240a4d4994bb56bf379d9f74a36a8210f3ba1dcd6ae01dd1949e7a02bd1010a8081b9",
+        );
+
+        let mut out = vec![0u8; plaintext.len()];
+        cbc256_encrypt_into(&plaintext, &key, &mut iv, &mut out);
+        assert_eq!(out, expected);
+        // CBC encrypt must chain the IV to the last ciphertext block.
+        assert_eq!(iv, &expected[expected.len() - 16..]);
+
+        let mut dec_iv: [u8; 16] = unhex("000102030405060708090a0b0c0d0e0f")
+            .try_into()
+            .unwrap();
+        let recovered = cbc256_decrypt(&expected, &key, &mut dec_iv);
+        assert_eq!(recovered, plaintext);
     }
 }

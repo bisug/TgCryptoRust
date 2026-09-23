@@ -21,10 +21,13 @@ use tgcryptors_core::AES_BLOCK_SIZE;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Copy a Python bytes-like value into a fixed-size Rust array.
-fn copy_array<const N: usize>(value: &[u8], label: &str) -> PyResult<[u8; N]> {
+///
+/// Returns a `Zeroizing` wrapper so the raw copy is wiped when dropped.
+fn copy_array<const N: usize>(value: &[u8], label: &str) -> PyResult<zeroize::Zeroizing<[u8; N]>> {
     value
         .try_into()
         .map_err(|_| PyValueError::new_err(format!("{label} must be exactly {N} bytes")))
+        .map(zeroize::Zeroizing::new)
 }
 
 /// Ensure block cipher input is aligned to the AES block size.
@@ -58,7 +61,7 @@ fn validate_ctr_state(state: &[u8]) -> PyResult<u8> {
 enum BufferInput<'py> {
     Bytes(Bound<'py, PyBytes>),
     ByteArray {
-        data: Vec<u8>,
+        data: zeroize::Zeroizing<Vec<u8>>,
         source: Bound<'py, PyByteArray>,
     },
 }
@@ -70,7 +73,7 @@ impl<'py> BufferInput<'py> {
         }
         if let Ok(array) = ob.cast::<PyByteArray>() {
             return Ok(BufferInput::ByteArray {
-                data: array.to_vec(),
+                data: zeroize::Zeroizing::new(array.to_vec()),
                 source: array.clone(),
             });
         }
@@ -97,24 +100,24 @@ impl<'py> BufferInput<'py> {
 
 /// Overwrite the contents of a `bytearray` with `value`.
 ///
-/// The buffer length is guaranteed to match `value` because extraction copied
-/// the exact same length and Python code cannot legally resize the object
-/// while this function holds it inside the critical section.
-fn write_back(byte_array: &Bound<'_, PyByteArray>, value: &[u8]) {
+/// Returns `ValueError` if the buffer was resized while the GIL was released
+/// during the cipher operation (possible from another thread).
+fn write_back(byte_array: &Bound<'_, PyByteArray>, value: &[u8]) -> PyResult<()> {
     with_critical_section(byte_array.as_any(), || {
-        debug_assert_eq!(
-            byte_array.len(),
-            value.len(),
-            "write_back: bytearray length ({}) must match value length ({})",
-            byte_array.len(),
-            value.len()
-        );
+        if byte_array.len() != value.len() {
+            return Err(PyValueError::new_err(format!(
+                "bytearray was resized during the operation: expected {} bytes, got {}",
+                value.len(),
+                byte_array.len()
+            )));
+        }
 
         // SAFETY: the critical section prevents concurrent mutation of the
-        // buffer, and the buffer was not resized since extraction; the
-        // lengths are asserted to match.
+        // buffer, and the runtime check above guarantees the length matches
+        // `value`, so the copy stays in bounds.
         unsafe { byte_array.as_bytes_mut() }.copy_from_slice(value);
-    });
+        Ok(())
+    })
 }
 
 /// Zero-copy PyBytes allocation with GIL release and panic isolation.
@@ -281,10 +284,10 @@ fn ctr256_encrypt<'py>(
     })?;
 
     if let Some(source) = iv_source {
-        write_back(&source, &next_iv);
+        write_back(&source, &*next_iv)?;
     }
     if let Some(source) = state_source {
-        write_back(&source, &[next_state]);
+        write_back(&source, &[next_state])?;
     }
 
     Ok(bytes)
@@ -378,7 +381,8 @@ fn runtime_info(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     info.set_item("version", VERSION)?;
     info.set_item("crate_version", VERSION)?;
     info.set_item("implementation", "rust")?;
-    info.set_item("aesni", tgcryptors_core::AESNI_FEATURE_ENABLED)?;
+    info.set_item("aesni_compiled", tgcryptors_core::AESNI_FEATURE_ENABLED)?;
+    info.set_item("aesni", tgcryptors_core::aesni_active())?;
     Ok(info)
 }
 
@@ -411,7 +415,7 @@ impl Ctr256 {
         let iv_arr = copy_array::<16>(iv, "IV")?;
         Ok(Ctr256 {
             ek: tgcryptors_core::ExpandedKey::new_encrypt(&key_arr),
-            iv: iv_arr,
+            iv: *iv_arr,
             state: 0,
         })
     }
@@ -473,7 +477,7 @@ impl Ige256 {
         Ok(Ige256 {
             enc_key: tgcryptors_core::ExpandedKey::new_encrypt(&key_arr),
             dec_key: tgcryptors_core::ExpandedKey::new_decrypt(&key_arr),
-            iv: iv_arr,
+            iv: *iv_arr,
         })
     }
 
