@@ -97,24 +97,24 @@ impl<'py> BufferInput<'py> {
 
 /// Overwrite the contents of a `bytearray` with `value`.
 ///
-/// The buffer length is guaranteed to match `value` because extraction copied
-/// the exact same length and Python code cannot legally resize the object
-/// while this function holds it inside the critical section.
-fn write_back(byte_array: &Bound<'_, PyByteArray>, value: &[u8]) {
+/// Returns `ValueError` if the buffer was resized while the GIL was released
+/// during the cipher operation (possible from another thread).
+fn write_back(byte_array: &Bound<'_, PyByteArray>, value: &[u8]) -> PyResult<()> {
     with_critical_section(byte_array.as_any(), || {
-        debug_assert_eq!(
-            byte_array.len(),
-            value.len(),
-            "write_back: bytearray length ({}) must match value length ({})",
-            byte_array.len(),
-            value.len()
-        );
+        if byte_array.len() != value.len() {
+            return Err(PyValueError::new_err(format!(
+                "bytearray was resized during the operation: expected {} bytes, got {}",
+                value.len(),
+                byte_array.len()
+            )));
+        }
 
         // SAFETY: the critical section prevents concurrent mutation of the
-        // buffer, and the buffer was not resized since extraction; the
-        // lengths are asserted to match.
+        // buffer, and the runtime check above guarantees the length matches
+        // `value`, so the copy stays in bounds.
         unsafe { byte_array.as_bytes_mut() }.copy_from_slice(value);
-    });
+        Ok(())
+    })
 }
 
 /// Zero-copy PyBytes allocation with GIL release and panic isolation.
@@ -281,10 +281,10 @@ fn ctr256_encrypt<'py>(
     })?;
 
     if let Some(source) = iv_source {
-        write_back(&source, &next_iv);
+        write_back(&source, &next_iv)?;
     }
     if let Some(source) = state_source {
-        write_back(&source, &[next_state]);
+        write_back(&source, &[next_state])?;
     }
 
     Ok(bytes)
