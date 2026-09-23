@@ -12,8 +12,8 @@
 //!
 //! The software fallback uses table lookups, which are not constant-time on
 //! all CPUs. If hardware AES acceleration is unavailable, evaluate that risk
-//! against your deployment model. The `neon` feature flag is reserved for a
-//! future ARM implementation and is not active yet.
+//! against your deployment model. No ARM NEON backend exists yet; ARM targets
+//! always use the software fallback.
 
 pub mod aes256;
 pub mod cbc256;
