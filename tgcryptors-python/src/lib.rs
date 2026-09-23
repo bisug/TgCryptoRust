@@ -21,10 +21,13 @@ use tgcryptors_core::AES_BLOCK_SIZE;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Copy a Python bytes-like value into a fixed-size Rust array.
-fn copy_array<const N: usize>(value: &[u8], label: &str) -> PyResult<[u8; N]> {
+///
+/// Returns a `Zeroizing` wrapper so the raw copy is wiped when dropped.
+fn copy_array<const N: usize>(value: &[u8], label: &str) -> PyResult<zeroize::Zeroizing<[u8; N]>> {
     value
         .try_into()
         .map_err(|_| PyValueError::new_err(format!("{label} must be exactly {N} bytes")))
+        .map(zeroize::Zeroizing::new)
 }
 
 /// Ensure block cipher input is aligned to the AES block size.
@@ -58,7 +61,7 @@ fn validate_ctr_state(state: &[u8]) -> PyResult<u8> {
 enum BufferInput<'py> {
     Bytes(Bound<'py, PyBytes>),
     ByteArray {
-        data: Vec<u8>,
+        data: zeroize::Zeroizing<Vec<u8>>,
         source: Bound<'py, PyByteArray>,
     },
 }
@@ -70,7 +73,7 @@ impl<'py> BufferInput<'py> {
         }
         if let Ok(array) = ob.cast::<PyByteArray>() {
             return Ok(BufferInput::ByteArray {
-                data: array.to_vec(),
+                data: zeroize::Zeroizing::new(array.to_vec()),
                 source: array.clone(),
             });
         }
@@ -281,7 +284,7 @@ fn ctr256_encrypt<'py>(
     })?;
 
     if let Some(source) = iv_source {
-        write_back(&source, &next_iv)?;
+        write_back(&source, &*next_iv)?;
     }
     if let Some(source) = state_source {
         write_back(&source, &[next_state])?;
@@ -412,7 +415,7 @@ impl Ctr256 {
         let iv_arr = copy_array::<16>(iv, "IV")?;
         Ok(Ctr256 {
             ek: tgcryptors_core::ExpandedKey::new_encrypt(&key_arr),
-            iv: iv_arr,
+            iv: *iv_arr,
             state: 0,
         })
     }
@@ -474,7 +477,7 @@ impl Ige256 {
         Ok(Ige256 {
             enc_key: tgcryptors_core::ExpandedKey::new_encrypt(&key_arr),
             dec_key: tgcryptors_core::ExpandedKey::new_decrypt(&key_arr),
-            iv: iv_arr,
+            iv: *iv_arr,
         })
     }
 

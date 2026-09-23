@@ -216,8 +216,11 @@ the default `aesni` feature. Other targets use a software fallback (T-table base
 not guaranteed constant-time on every CPU). `runtime_info()` reports both the
 compile-time flag (`aesni_compiled`) and the runtime probe (`aesni`).
 
-Expanded key material is zeroized on drop using the [`zeroize`](https://crates.io/crates/zeroize)
-crate, which guarantees the compiler will not optimize away the clearing.
+Expanded key material, key/IV copies made internally, and `bytearray` snapshots
+taken for the duration of a call are zeroized on drop using the
+[`zeroize`](https://crates.io/crates/zeroize) crate, which guarantees the
+compiler will not optimize away the clearing. Returned `bytes` objects live in
+Python's allocator and are not zeroized.
 
 ## Migrating From TgrCrypto
 
