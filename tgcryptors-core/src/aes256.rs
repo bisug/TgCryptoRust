@@ -85,6 +85,23 @@ fn use_aesni() -> bool {
     }
 }
 
+/// Whether AES-NI is actually usable on this CPU right now.
+///
+/// Unlike [`crate::AESNI_FEATURE_ENABLED`] (compile-time flag), this performs
+/// the runtime CPUID probe, so it returns `false` on x86 CPUs without AES-NI
+/// and on builds without the `aesni` feature.
+#[inline]
+pub fn aesni_active() -> bool {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        use_aesni()
+    }
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    {
+        false
+    }
+}
+
 // AES-NI backend.
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

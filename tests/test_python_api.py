@@ -200,6 +200,7 @@ class TgCryptoApiTests(unittest.TestCase):
         self.assertEqual(info["crate_version"], tgcrypto.__version__)
         self.assertEqual(info["implementation"], "rust")
         self.assertIsInstance(info["aesni"], bool)
+        self.assertIsInstance(info["aesni_compiled"], bool)
 
     def test_nist_sp800_38a_ctr_cbc_known_answers(self) -> None:
         key = bytes.fromhex(

@@ -213,7 +213,8 @@ return types, and validation behavior match the original TgCrypto:
 
 On x86 and x86_64, AES-NI is detected at runtime when the crate is built with
 the default `aesni` feature. Other targets use a software fallback (T-table based,
-not guaranteed constant-time on every CPU).
+not guaranteed constant-time on every CPU). `runtime_info()` reports both the
+compile-time flag (`aesni_compiled`) and the runtime probe (`aesni`).
 
 Expanded key material is zeroized on drop using the [`zeroize`](https://crates.io/crates/zeroize)
 crate, which guarantees the compiler will not optimize away the clearing.

@@ -378,7 +378,8 @@ fn runtime_info(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     info.set_item("version", VERSION)?;
     info.set_item("crate_version", VERSION)?;
     info.set_item("implementation", "rust")?;
-    info.set_item("aesni", tgcryptors_core::AESNI_FEATURE_ENABLED)?;
+    info.set_item("aesni_compiled", tgcryptors_core::AESNI_FEATURE_ENABLED)?;
+    info.set_item("aesni", tgcryptors_core::aesni_active())?;
     Ok(info)
 }
 

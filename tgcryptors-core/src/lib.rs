@@ -21,6 +21,9 @@ pub mod ctr256;
 pub mod ige256;
 
 /// Whether the crate was compiled with the AES-NI feature enabled.
+///
+/// Compile-time only: it does NOT mean AES-NI is usable on this CPU.
+/// Use [`aesni_active`] for the runtime probe.
 pub const AESNI_FEATURE_ENABLED: bool = cfg!(feature = "aesni");
 
 /// AES block size in bytes (16).
@@ -37,7 +40,7 @@ pub(crate) fn unhex(s: &str) -> Vec<u8> {
 }
 
 /// Re-export the main APIs for convenience.
-pub use aes256::ExpandedKey;
+pub use aes256::{aesni_active, ExpandedKey};
 pub use cbc256::{cbc256_decrypt, cbc256_decrypt_into, cbc256_encrypt, cbc256_encrypt_into};
 pub use ctr256::{ctr256_decrypt, ctr256_encrypt, ctr256_encrypt_into, ctr256_encrypt_into_ek};
 pub use ige256::{
